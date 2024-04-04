@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-edot-user-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-edot-user
+spec:
+  selector:
+    matchLabels:
+      app: postgres-edot-user
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: postgres-edot-user
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:13
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: "user"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-edot-secret
+                  key: password
+            - name: POSTGRES_DB
+              value: "edot_user_db"
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-storage
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-edot-user-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-edot-user
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+  selector:
+    app: postgres-edot-user
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edot-user-service
+spec:
+  selector:
+    matchLabels:
+      app: edot-user-service
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: edot-user-service
+    spec:
+      containers:
+        - name: edot-user-service
+          image: dendyramdhan/edot-user-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_HOST
+              value: "postgres-edot-user"
+            - name: DB_USER
+              value: "user"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-edot-secret
+                  key: password
+            - name: DB_NAME
+              value: "edot_user_db"
+            - name: DB_PORT
+              value: "5432"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: edot-user-service
+spec:
+  type: NodePort
+  ports:
+    - port: 8080
+  selector:
+    app: edot-user-service

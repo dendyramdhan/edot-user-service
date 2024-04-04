@@ -29,6 +29,29 @@ func main() {
 		})
 	})
 
+	// Route to hit the order service ping endpoint
+	router.GET("/hit-order-ping", func(c *gin.Context) {
+		resp, err := http.Get("http://edot-order-service:8080/ping")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to contact order service",
+			})
+			return
+		}
+		defer resp.Body.Close()
+
+		// Forward the response from the order service
+		if resp.StatusCode == http.StatusOK {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "Successfully hit order service ping",
+			})
+		} else {
+			c.JSON(resp.StatusCode, gin.H{
+				"error": "Bad response from order service",
+			})
+		}
+	})
+
 	router.Run(":8080")
 }
 
